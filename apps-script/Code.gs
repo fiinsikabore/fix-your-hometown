@@ -5,10 +5,12 @@
  * Every pin is one row in the "Pins" sheet.
  * To hide a pin from the website, type TRUE in its "hidden" column.
  * Never share the "token" column: it lets a student edit their own pin.
+ * Email and phone are only shown on the website when the student ticks share_contact.
  */
 
 const SHEET_NAME = 'Pins';
-const HEADERS = ['id', 'token', 'at', 'name', 'country', 'city', 'category', 'problem', 'team', 'contact', 'hidden'];
+const HEADERS = ['id', 'token', 'at', 'full_name', 'country', 'city', 'category', 'problem', 'team', 'email', 'phone', 'share_contact', 'hidden'];
+const HIDDEN_COL = 12; // 0-based index of 'hidden'
 
 const COUNTRY_CODES = ['MA','DZ','TN','LY','EG','CV','MR','ML','NE','TD','SD','ER','SN','GM','BF','NG','CF','SS','ET','DJ',
   'GW','GN','CI','GH','CM','UG','KE','SO','SL','LR','TG','BJ','GA','CD','RW','ST','GQ','CG','BI','TZ','SC','AO','ZM','MW',
@@ -52,10 +54,12 @@ function doGet(e) {
     const pins = [];
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
-      if (!r[0] || r[10] === true || String(r[10]).toUpperCase() === 'TRUE') continue;
+      if (!r[0] || r[HIDDEN_COL] === true || String(r[HIDDEN_COL]).toUpperCase() === 'TRUE') continue;
+      const share = r[11] === true || String(r[11]).toUpperCase() === 'TRUE';
       pins.push({
         id: r[0], at: Number(r[2]) || 0, name: r[3], country: r[4], city: r[5],
-        category: r[6], problem: r[7], team: r[8] === true || String(r[8]).toUpperCase() === 'TRUE', contact: r[9]
+        category: r[6], problem: r[7], team: r[8] === true || String(r[8]).toUpperCase() === 'TRUE',
+        contact: share ? [r[9], r[10]].filter(String).join(' · ') : ''
       });
     }
     return json_({ ok: true, pins: pins });
@@ -92,20 +96,24 @@ function handle_(raw) {
 
     if (body.action === 'save') {
       const pin = {
-        name: clean_(body.name, 30),
+        name: clean_(body.name, 60),
         country: clean_(body.country, 2).toUpperCase(),
         city: clean_(body.city, 40),
         category: clean_(body.category, 40),
         problem: clean_(body.problem, 240),
         team: body.team === true,
-        contact: clean_(body.contact, 60)
+        email: clean_(body.email, 80).toLowerCase(),
+        phone: clean_(body.phone, 25),
+        share: body.share === true
       };
-      if (!pin.name) return json_({ ok: false, error: 'Name is required' });
+      if (pin.name.split(/\s+/).length < 2) return json_({ ok: false, error: 'Full name is required' });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pin.email)) return json_({ ok: false, error: 'A valid email is required' });
+      if (pin.phone.replace(/\D/g, '').length < 8) return json_({ ok: false, error: 'A valid phone number is required' });
       if (COUNTRY_CODES.indexOf(pin.country) < 0) return json_({ ok: false, error: 'Unknown country' });
       if (CATEGORIES.indexOf(pin.category) < 0) return json_({ ok: false, error: 'Unknown Grand Challenge or Opportunity' });
       if (pin.problem.length < 15) return json_({ ok: false, error: 'Problem is too short' });
       // Stop formulas being injected into the sheet
-      ['name', 'city', 'problem', 'contact'].forEach(function (k) {
+      ['name', 'city', 'problem', 'email'].forEach(function (k) {
         if (/^[=+\-@]/.test(pin[k])) pin[k] = "'" + pin[k];
       });
 
@@ -113,15 +121,15 @@ function handle_(raw) {
       if (body.id && body.token) {
         const row = findRow(clean_(body.id, 64), clean_(body.token, 64));
         if (row > 0) {
-          const hidden = rows[row - 1][10];
+          const hidden = rows[row - 1][HIDDEN_COL];
           sh.getRange(row, 1, 1, HEADERS.length).setValues([[body.id, body.token, now, pin.name, pin.country, pin.city,
-            pin.category, pin.problem, pin.team, pin.contact, hidden]]);
+            pin.category, pin.problem, pin.team, pin.email, "'" + pin.phone, pin.share, hidden]]);
           return json_({ ok: true, id: body.id, token: body.token });
         }
       }
       if (rows.length > 3000) return json_({ ok: false, error: 'The map is full' });
       const id = Utilities.getUuid(), token = Utilities.getUuid();
-      sh.appendRow([id, token, now, pin.name, pin.country, pin.city, pin.category, pin.problem, pin.team, pin.contact, false]);
+      sh.appendRow([id, token, now, pin.name, pin.country, pin.city, pin.category, pin.problem, pin.team, pin.email, "'" + pin.phone, pin.share, false]);
       return json_({ ok: true, id: id, token: token });
     }
 

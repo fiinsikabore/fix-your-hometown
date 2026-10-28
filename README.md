@@ -33,7 +33,8 @@ const API_URL = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
 
 ## Managing pins
 
-- Every pin is a row in the **Pins** tab. You can sort, filter or export it like any sheet.
+- Every pin is a row in the **Pins** tab, with each student's full name, email and phone. Email and phone appear on the website only if the student ticks "Show my email and phone".
+- You can sort, filter or export the sheet like any other.
 - To hide a pin from the website, type `TRUE` in its **hidden** column.
 - Never share the **token** column: it lets each student edit their own pin.
 - Students can edit or remove their own pin from the same browser they used to create it.

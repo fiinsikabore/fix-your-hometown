@@ -263,8 +263,8 @@ h1 em{font-style:italic;font-weight:600}
       </div>
       <div class="grid-f">
         <div class="field full">
-          <label for="fName">Your first name</label>
-          <input id="fName" maxlength="30" placeholder="Your first name" autocomplete="given-name">
+          <label for="fName">Full name</label>
+          <input id="fName" maxlength="60" placeholder="First and last name" autocomplete="name" required>
         </div>
         <div class="field">
           <label for="fCountry">Home country</label>
@@ -287,9 +287,16 @@ h1 em{font-style:italic;font-weight:600}
           <span class="lab">Team</span>
           <label class="switch" for="fTeam"><input type="checkbox" id="fTeam"><span class="track"></span>I'm looking for teammates to work on this</label>
         </div>
+        <div class="field">
+          <label for="fEmail">Email</label>
+          <input id="fEmail" type="email" maxlength="80" placeholder="you@alustudent.com" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="fPhone">Phone (WhatsApp)</label>
+          <input id="fPhone" type="tel" maxlength="25" placeholder="+250 7XX XXX XXX" autocomplete="tel" required>
+        </div>
         <div class="field full">
-          <label for="fContact">How teammates can reach you (optional)</label>
-          <input id="fContact" maxlength="60" placeholder="ALU email or WhatsApp number" autocomplete="off">
+          <label class="switch" for="fShare"><input type="checkbox" id="fShare"><span class="track"></span>Show my email and phone on my pin so other students can contact me</label>
         </div>
       </div>
       <div class="actions">
@@ -297,7 +304,7 @@ h1 em{font-style:italic;font-weight:600}
         <button class="btn ghost" id="remove" type="button" hidden>Remove my pin</button>
         <span class="msg" id="msg" role="status"></span>
       </div>
-      <p class="notice" id="notice">Your pin, first name and contact (if you add one) are visible to everyone who opens this page. Only share contact details you're happy to make public. You can edit or remove your pin from this same browser.</p>
+      <p class="notice" id="notice">Your name and pin are visible to everyone who opens this page. Your email and phone go only to the organising committee, unless you choose to show them on your pin. You can edit or remove your pin from this same browser.</p>
     </form>
   </section>
 
@@ -487,7 +494,7 @@ function fillForm(){
   $("submit").textContent=mp?"Save changes":"Pin it";
   if(mp&&!formFilled){formFilled=true;
     $("fName").value=mp.name||"";fC.value=mp.country||"";$("fCity").value=mp.city||"";fK.value=mp.category||"";$("fProblem").value=mp.problem||"";
-    $("fTeam").checked=!!mp.team;$("fContact").value=mp.contact||"";$("count").textContent=$("fProblem").value.length+" / 240";}
+    $("fTeam").checked=!!mp.team;const pv=store.get("fyh-private")||{};$("fEmail").value=pv.email||"";$("fPhone").value=pv.phone||"";$("fShare").checked=!!pv.share;$("count").textContent=$("fProblem").value.length+" / 240";}
 }
 const msg=(t,kind)=>{const m=$("msg");m.textContent=t;m.className="msg"+(kind?" "+kind:"")};
 
@@ -514,15 +521,17 @@ function showConn(t){const s=$("setup");s.replaceChildren(el("strong",null,"Conn
 $("form").addEventListener("submit",async e=>{
   e.preventDefault();
   if(!CONNECTED){msg("This site isn't connected to its Google Sheet yet.","err");return}
-  const data={name:$("fName").value.trim().slice(0,30),country:fC.value,city:$("fCity").value.trim().slice(0,40),category:fK.value,problem:$("fProblem").value.trim().slice(0,240),team:$("fTeam").checked,contact:$("fContact").value.trim().slice(0,60)};
-  if(!data.name){msg("Add your first name.","err");$("fName").focus();return}
+  const data={name:$("fName").value.trim().slice(0,30),country:fC.value,city:$("fCity").value.trim().slice(0,40),category:fK.value,problem:$("fProblem").value.trim().slice(0,240),team:$("fTeam").checked,email:$("fEmail").value.trim().slice(0,80),phone:$("fPhone").value.trim().slice(0,25),share:$("fShare").checked};
+  if(data.name.split(/\s+/).length<2){msg("Add your full name (first and last name).","err");$("fName").focus();return}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)){msg("Add a valid email address.","err");$("fEmail").focus();return}
+  if(data.phone.replace(/\D/g,"").length<8){msg("Add a valid phone number.","err");$("fPhone").focus();return}
   if(!data.country){msg("Choose your home country.","err");fC.focus();return}
   if(!data.category){msg("Choose a Grand Challenge or Opportunity.","err");fK.focus();return}
   if(data.problem.length<15){msg("Describe the problem in at least one full sentence.","err");$("fProblem").focus();return}
   $("submit").disabled=true;msg("Saving…");
   try{
     const j=await api(Object.assign({action:"save"},mine||{},data));
-    mine={id:j.id,token:j.token};store.set("fyh-mine",mine);formFilled=true;
+    mine={id:j.id,token:j.token};store.set("fyh-mine",mine);store.set("fyh-private",{email:data.email,phone:data.phone,share:data.share});formFilled=true;
     msg("Pinned. "+NAME[data.country]+" is lit up on the map.","ok");selected=data.country;await load();
   }catch(err){msg("Couldn't save your pin: "+err.message,"err")}
   finally{$("submit").disabled=false}
@@ -530,7 +539,7 @@ $("form").addEventListener("submit",async e=>{
 $("remove").addEventListener("click",async()=>{
   if(!confirmRemove){confirmRemove=true;$("remove").textContent="Tap again to remove";setTimeout(()=>{confirmRemove=false;$("remove").textContent="Remove my pin"},3000);return}
   confirmRemove=false;$("remove").textContent="Remove my pin";
-  try{await api({action:"delete",id:mine.id,token:mine.token});mine=null;store.del("fyh-mine");formFilled=false;$("form").reset();$("count").textContent="0 / 240";msg("Your pin was removed.","ok");await load()}
+  try{await api({action:"delete",id:mine.id,token:mine.token});mine=null;store.del("fyh-mine");store.del("fyh-private");formFilled=false;$("form").reset();$("count").textContent="0 / 240";msg("Your pin was removed.","ok");await load()}
   catch(err){msg("Couldn't remove your pin. Try again in a moment.","err")}
 });
 
