@@ -13,8 +13,10 @@ const HEADERS = ['id', 'token', 'at', 'name', 'country', 'city', 'category', 'pr
 const COUNTRY_CODES = ['MA','DZ','TN','LY','EG','CV','MR','ML','NE','TD','SD','ER','SN','GM','BF','NG','CF','SS','ET','DJ',
   'GW','GN','CI','GH','CM','UG','KE','SO','SL','LR','TG','BJ','GA','CD','RW','ST','GQ','CG','BI','TZ','SC','AO','ZM','MW',
   'KM','NA','BW','ZW','MZ','MG','ZA','LS','SZ','MU','XX'];
-const CATEGORIES = ['Health','Education','Water & sanitation','Energy','Food & agriculture','Jobs & income',
-  'Climate & environment','Transport','Other'];
+// ALU Grand Challenges and Great Opportunities
+const CATEGORIES = ['Urbanization','Education','Healthcare','Climate Change','Governance','Job Creation','Infrastructure',
+  'Agriculture','Natural Resource Management','Wildlife Conservation','Regional Integration','Arts, Design & Culture',
+  'Tourism','Empowerment of Women'];
 
 /** Run this once from the editor (select "setup" then click Run). */
 function setup() {
@@ -38,8 +40,13 @@ function clean_(v, max) {
   return String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
 }
 
-/** GET ?action=list → all visible pins (tokens are never sent). */
+/** GET ?action=list → all visible pins (tokens are never sent).
+ *  GET ?action=save|delete&data={...} → same as POST (fallback for browsers that block POST). */
 function doGet(e) {
+  const p = (e && e.parameter) || {};
+  if ((p.action === 'save' || p.action === 'delete') && p.data) {
+    return handle_(p.data);
+  }
   try {
     const rows = sheet_().getDataRange().getValues();
     const pins = [];
@@ -59,10 +66,14 @@ function doGet(e) {
 
 /** POST {action:"save"|"delete", ...} */
 function doPost(e) {
+  return handle_((e && e.postData && e.postData.contents) || '{}');
+}
+
+function handle_(raw) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000);
-    const body = JSON.parse(e.postData.contents || '{}');
+    const body = JSON.parse(raw);
     const sh = sheet_();
     const rows = sh.getDataRange().getValues();
     const findRow = function (id, token) {
@@ -84,14 +95,14 @@ function doPost(e) {
         name: clean_(body.name, 30),
         country: clean_(body.country, 2).toUpperCase(),
         city: clean_(body.city, 40),
-        category: clean_(body.category, 30),
+        category: clean_(body.category, 40),
         problem: clean_(body.problem, 240),
         team: body.team === true,
         contact: clean_(body.contact, 60)
       };
       if (!pin.name) return json_({ ok: false, error: 'Name is required' });
       if (COUNTRY_CODES.indexOf(pin.country) < 0) return json_({ ok: false, error: 'Unknown country' });
-      if (CATEGORIES.indexOf(pin.category) < 0) return json_({ ok: false, error: 'Unknown theme' });
+      if (CATEGORIES.indexOf(pin.category) < 0) return json_({ ok: false, error: 'Unknown Grand Challenge or Opportunity' });
       if (pin.problem.length < 15) return json_({ ok: false, error: 'Problem is too short' });
       // Stop formulas being injected into the sheet
       ['name', 'city', 'problem', 'contact'].forEach(function (k) {

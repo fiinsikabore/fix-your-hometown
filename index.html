@@ -193,6 +193,10 @@ h1 em{font-style:italic;font-weight:600}
 .foot{text-align:center;color:var(--muted);font-size:12.5px}
 .setup{max-width:1180px;margin:0 auto 20px;padding:14px 18px;border-radius:14px;background:var(--strong);color:var(--on-strong);font-size:14px}
 .setup code{font-weight:700}
+.filters{display:grid;gap:10px}
+.chip-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.chip-label{width:100%;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.filters>.chip{justify-self:start}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -260,7 +264,7 @@ h1 em{font-style:italic;font-weight:600}
       <div class="grid-f">
         <div class="field full">
           <label for="fName">Your first name</label>
-          <input id="fName" maxlength="30" placeholder="e.g. Fiinsi" autocomplete="given-name">
+          <input id="fName" maxlength="30" placeholder="Your first name" autocomplete="given-name">
         </div>
         <div class="field">
           <label for="fCountry">Home country</label>
@@ -268,15 +272,15 @@ h1 em{font-style:italic;font-weight:600}
         </div>
         <div class="field">
           <label for="fCity">City or town</label>
-          <input id="fCity" maxlength="40" placeholder="e.g. Ouagadougou" autocomplete="off">
+          <input id="fCity" maxlength="40" placeholder="Your city or town" autocomplete="off">
         </div>
         <div class="field full">
-          <label for="fCat">Theme</label>
+          <label for="fCat">Grand Challenge or Opportunity</label>
           <select id="fCat" required></select>
         </div>
         <div class="field full">
           <label for="fProblem">The problem</label>
-          <textarea id="fProblem" maxlength="240" placeholder="e.g. Students in my town walk over 5 km to reach a school with electricity, so they can't study after dark."></textarea>
+          <textarea id="fProblem" maxlength="240" placeholder="What is the problem, who does it affect, and why does it matter to you?"></textarea>
           <span class="counter" id="count">0 / 240</span>
         </div>
         <div class="field full">
@@ -320,7 +324,9 @@ const COUNTRIES=[
 ["NA","Namibia",7,5],["BW","Botswana",7,6],["ZW","Zimbabwe",7,7],["MZ","Mozambique",7,8],["MG","Madagascar",7,9],
 ["ZA","South Africa",8,5],["LS","Lesotho",8,6],["SZ","Eswatini",8,7],["MU","Mauritius",8,9]];
 const NAME=Object.fromEntries(COUNTRIES.map(c=>[c[0],c[1]])); NAME.XX="Outside Africa";
-const CATS=["Health","Education","Water & sanitation","Energy","Food & agriculture","Jobs & income","Climate & environment","Transport","Other"];
+const GROUPS={"Grand Challenges":["Urbanization","Education","Healthcare","Climate Change","Governance","Job Creation","Infrastructure"],
+  "Great Opportunities":["Agriculture","Natural Resource Management","Wildlife Conservation","Regional Integration","Arts, Design & Culture","Tourism","Empowerment of Women"]};
+const CATS=[...GROUPS["Grand Challenges"],...GROUPS["Great Opportunities"]];
 const NUM={MA:"504",DZ:"012",TN:"788",LY:"434",EG:"818",CV:"132",MR:"478",ML:"466",NE:"562",TD:"148",SD:"729",ER:"232",SN:"686",GM:"270",BF:"854",NG:"566",CF:"140",SS:"728",ET:"231",DJ:"262",GW:"624",GN:"324",CI:"384",GH:"288",CM:"120",UG:"800",KE:"404",SO:"706",SL:"694",LR:"430",TG:"768",BJ:"204",GA:"266",CD:"180",RW:"646",ST:"678",GQ:"226",CG:"178",BI:"108",TZ:"834",SC:"690",AO:"024",ZM:"894",MW:"454",KM:"174",NA:"516",BW:"072",ZW:"716",MZ:"508",MG:"450",ZA:"710",LS:"426",SZ:"748",MU:"480"};
 const LL={MA:[-6.5,32],DZ:[2.6,28],TN:[9.5,34],LY:[17,27],EG:[30,26.5],CV:[-23.6,15.1],MR:[-10.5,20.2],ML:[-2,17.5],NE:[9.4,17.5],TD:[18.7,15.4],SD:[30,15.5],ER:[38.8,15.3],SN:[-14.5,14.4],GM:[-15.4,13.4],BF:[-1.6,12.3],NG:[8.1,9.6],CF:[20.9,6.6],SS:[30.5,7.3],ET:[39.6,8.6],DJ:[42.6,11.8],GW:[-15,12],GN:[-11,10.4],CI:[-5.5,7.6],GH:[-1.2,7.9],CM:[12.7,5.7],UG:[32.4,1.3],KE:[37.9,0.2],SO:[46,5.5],SL:[-11.8,8.5],LR:[-9.4,6.4],TG:[0.9,8.5],BJ:[2.3,9.5],GA:[11.6,-0.6],CD:[23.6,-2.9],RW:[29.9,-2],ST:[6.6,0.3],GQ:[10.4,1.6],CG:[15.2,-0.8],BI:[29.9,-3.4],TZ:[34.8,-6.3],SC:[55.45,-4.6],AO:[17.5,-12.3],ZM:[27.8,-13.4],MW:[34.3,-13.2],KM:[43.9,-11.9],NA:[17.2,-22.1],BW:[24.7,-22.2],ZW:[29.8,-19],MZ:[35.5,-17.3],MG:[46.7,-19.4],ZA:[24.7,-29],LS:[28.2,-29.6],SZ:[31.5,-26.5],MU:[57.55,-20.3]};
 const EXCL=new Set(["887","682","512","376","275","400","368","414","784","634","760","422","724","620","380","300","792","196","470","364","048","250"]);
@@ -347,18 +353,18 @@ grid.flat().forEach(c=>{
 });
 
 /* ---------- filters + form setup ---------- */
-["All",...CATS].forEach(k=>{
-  const b=el("button","chip",k);b.type="button";b.setAttribute("aria-pressed",k===cat);
-  b.addEventListener("click",()=>{cat=k;[...$("cats").children].forEach(x=>x.setAttribute("aria-pressed",x.textContent===cat));render()});
-  $("cats").appendChild(b);
-});
+const chips=[];
+const addChip=(k,label)=>{const b=el("button","chip",label||k);b.type="button";b.dataset.cat=k;b.setAttribute("aria-pressed",k===cat);
+  b.addEventListener("click",()=>{cat=k;chips.forEach(x=>x.setAttribute("aria-pressed",x.dataset.cat===cat));render()});chips.push(b);return b};
+$("cats").append(addChip("All","All themes"));
+for(const g in GROUPS){const row=el("div","chip-group");row.append(el("span","chip-label",g));GROUPS[g].forEach(k=>row.append(addChip(k)));$("cats").append(row)}
 $("teamOnly").addEventListener("change",e=>{teamOnly=e.target.checked;render()});
 $("clearSel").addEventListener("click",()=>{selected=null;render()});
 $("goPin").addEventListener("click",()=>$("pinForm").scrollIntoView({behavior:"smooth",block:"start"}));
 const fC=$("fCountry");fC.append(new Option("Choose your country",""));
 [...COUNTRIES].sort((a,b)=>a[1].localeCompare(b[1])).forEach(c=>fC.append(new Option(c[1],c[0])));
 fC.append(new Option("Outside Africa","XX"));
-const fK=$("fCat");fK.append(new Option("Choose a theme",""));CATS.forEach(k=>fK.append(new Option(k,k)));
+const fK=$("fCat");fK.append(new Option("Choose one",""));for(const g in GROUPS){const og=document.createElement("optgroup");og.label=g;GROUPS[g].forEach(k=>og.append(new Option(k,k)));fK.append(og)}
 $("fProblem").addEventListener("input",e=>$("count").textContent=e.target.value.length+" / 240");
 
 /* ---------- real map ---------- */
@@ -487,15 +493,23 @@ const msg=(t,kind)=>{const m=$("msg");m.textContent=t;m.className="msg"+(kind?" 
 
 /* ---------- data (Google Sheet via Apps Script) ---------- */
 async function api(body){
-  const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)});
-  const j=await r.json();if(!j.ok)throw new Error(j.error||"Request failed");return j;
+  let j;
+  try{const r=await fetch(API_URL,{method:"POST",body:JSON.stringify(body)});j=await r.json()}
+  catch(_){ // fallback: some setups block POST, so send the same request as a GET
+    try{const r=await fetch(API_URL+"?action="+encodeURIComponent(body.action)+"&data="+encodeURIComponent(JSON.stringify(body)));j=await r.json()}
+    catch(e){throw new Error("can't reach the Google Sheet. Check the web app URL and that access is set to Anyone.")}
+  }
+  if(!j.ok)throw new Error(j.error||"request failed");return j;
 }
 async function load(){
   if(!CONNECTED)return;
   try{const r=await fetch(API_URL+"?action=list");const j=await r.json();
+    if(!j.ok){showConn("The Google Sheet answered with an error: "+j.error);return}
+    $("setup").hidden=true;
     if(j.ok){pins=j.pins;if(mine&&!pins.find(p=>p.id===mine.id)){mine=null;store.del("fyh-mine")}render();fillForm()}}
-  catch(e){console.warn("Could not load pins",e)}
+  catch(e){showConn("Can't reach the Google Sheet. Check that API_URL ends with /exec and the web app access is set to Anyone.")}
 }
+function showConn(t){const s=$("setup");s.replaceChildren(el("strong",null,"Connection problem. "),document.createTextNode(t));s.hidden=false}
 
 $("form").addEventListener("submit",async e=>{
   e.preventDefault();
@@ -503,7 +517,7 @@ $("form").addEventListener("submit",async e=>{
   const data={name:$("fName").value.trim().slice(0,30),country:fC.value,city:$("fCity").value.trim().slice(0,40),category:fK.value,problem:$("fProblem").value.trim().slice(0,240),team:$("fTeam").checked,contact:$("fContact").value.trim().slice(0,60)};
   if(!data.name){msg("Add your first name.","err");$("fName").focus();return}
   if(!data.country){msg("Choose your home country.","err");fC.focus();return}
-  if(!data.category){msg("Choose a theme for your problem.","err");fK.focus();return}
+  if(!data.category){msg("Choose a Grand Challenge or Opportunity.","err");fK.focus();return}
   if(data.problem.length<15){msg("Describe the problem in at least one full sentence.","err");$("fProblem").focus();return}
   $("submit").disabled=true;msg("Saving…");
   try{
