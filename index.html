@@ -510,7 +510,7 @@ $("form").addEventListener("submit",async e=>{
     const j=await api(Object.assign({action:"save"},mine||{},data));
     mine={id:j.id,token:j.token};store.set("fyh-mine",mine);formFilled=true;
     msg("Pinned. "+NAME[data.country]+" is lit up on the map.","ok");selected=data.country;await load();
-  }catch(err){msg("Couldn't save your pin. Check your connection and try again.","err")}
+  }catch(err){msg("Couldn't save your pin: "+err.message,"err")}
   finally{$("submit").disabled=false}
 });
 $("remove").addEventListener("click",async()=>{
